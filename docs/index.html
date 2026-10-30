@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TokenLean — token-minimal support automation</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #09090b; color: #fafafa; font-family: ui-sans-system, system-ui, -apple-system, sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 2rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .sub { color: #a1a1aa; margin: 0 0 18px; line-height: 1.5; }
+  .badge { display: inline-block; border: 1px solid #f59e0b55; color: #fbbf24; border-radius: 999px; padding: 4px 12px; font-size: 0.8rem; margin-bottom: 18px; }
+  .badge.live { border-color: #34d39955; color: #6ee7b7; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 16px; }
+  .card .label { color: #a1a1aa; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; }
+  .card .value { font-size: 1.7rem; font-weight: 700; margin-top: 6px; }
+  .card .note { color: #a1a1aa; font-size: 0.85rem; margin-top: 4px; }
+  .card.good .value { color: #6ee7b7; }
+  .card.bad .value { color: #fda4af; }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 22px; color: #d4d4d8; }
+  .flow span { background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 8px 12px; font-size: 0.9rem; }
+  .flow .arrow { background: none; border: none; padding: 0; color: #71717a; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #27272a; }
+  th { color: #a1a1aa; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 0.75rem; }
+  .pill.debug { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b55; }
+  .pill.zero { background: #34d39922; color: #6ee7b7; border: 1px solid #34d39955; }
+  .foot { color: #71717a; font-size: 0.85rem; margin-top: 20px; line-height: 1.5; }
+  a { color: #93c5fd; }
+  @media (max-width: 640px) { table { font-size: 0.8rem; } th, td { padding: 7px 6px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TokenLean</h1>
+  <p class="sub">The same 25 support tickets through two architectures. The agentic loop
+  spends a model call at every step; the token-minimal pipeline spends <b>zero
+  tokens</b> unless its test gate fails — then exactly one debug call.</p>
+  <span class="badge" id="modeBadge">DEMO MODE · step outputs deterministic · token counts exact (tiktoken cl100k) · costs at illustrative frontier rates $3/$15 per 1M</span>
+  <div class="grid" id="stats"></div>
+  <div class="flow">
+    <span>1 · Classify (code, 0 tokens)</span><span class="arrow">→</span>
+    <span>2 · Test gate: confidence · fields · policy</span><span class="arrow">→</span>
+    <span>3 · Draft from template (0 tokens)</span><span class="arrow">→</span>
+    <span>4 · Debug call only on gate failure</span>
+  </div>
+  <div class="card" style="padding:0; overflow-x:auto;">
+    <table>
+      <thead><tr>
+        <th>Ticket</th><th>Truth</th>
+        <th class="num">Agentic tokens</th><th class="num">Agentic cost</th>
+        <th class="num">Minimal tokens</th><th class="num">Minimal cost</th>
+        <th>Gate</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <p class="foot">Accuracy is measured against ground-truth labels on a fixed 25-ticket
+  set. Source: <a href="https://github.com/shashankreddyg1/tokenlean">github.com/shashankreddyg1/tokenlean</a>.
+  Idea: "token minimizing, not token maxing" — use frontier models to write the code, then let tested software run on its own.</p>
+</div>
+<script>
+var API_BASE = "__API_BASE__";
+var FALLBACK = {"mode": "demo", "token_method": "tiktoken cl100k_base", "tickets": 25, "totals": {"agentic": {"tickets": 25, "correct": 25, "accuracy": 1.0, "input_tokens": 4272, "output_tokens": 1695, "total_tokens": 5967, "cost_usd": 0.038241, "model_calls": 125, "debug_calls": 0, "latency_ms": 24.9}, "token_minimal": {"tickets": 25, "correct": 25, "accuracy": 1.0, "input_tokens": 187, "output_tokens": 70, "total_tokens": 257, "cost_usd": 0.001611, "model_calls": 2, "debug_calls": 2, "latency_ms": 4.7}}, "savings_pct": 95.8, "rows": [{"ticket_id": 1, "subject": "Charged twice for my subscription", "truth_category": "billing", "pipeline": "agentic", "predicted_category": "billing", "correct": true, "input_tokens": 184, "output_tokens": 75, "cost_usd": 0.001677, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 2, "subject": "Invoice shows the wrong plan price", "truth_category": "billing", "pipeline": "agentic", "predicted_category": "billing", "correct": true, "input_tokens": 186, "output_tokens": 75, "cost_usd": 0.001683, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 3, "subject": "Payment failed but money was deducted", "truth_category": "billing", "pipeline": "agentic", "predicted_category": "billing", "correct": true, "input_tokens": 184, "output_tokens": 75, "cost_usd": 0.001677, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 4, "subject": "Need a copy of last month's invoice", "truth_category": "billing", "pipeline": "agentic", "predicted_category": "billing", "correct": true, "input_tokens": 182, "output_tokens": 75, "cost_usd": 0.001671, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 5, "subject": "Cannot log in, password reset link expired", "truth_category": "access", "pipeline": "agentic", "predicted_category": "access", "correct": true, "input_tokens": 185, "output_tokens": 66, "cost_usd": 0.001545, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 6, "subject": "Two-factor codes not arriving", "truth_category": "access", "pipeline": "agentic", "predicted_category": "access", "correct": true, "input_tokens": 170, "output_tokens": 66, "cost_usd": 0.0015, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 7, "subject": "Locked out after too many attempts", "truth_category": "access", "pipeline": "agentic", "predicted_category": "access", "correct": true, "input_tokens": 167, "output_tokens": 66, "cost_usd": 0.001491, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 8, "subject": "SSO login loops back to the sign-in page", "truth_category": "access", "pipeline": "agentic", "predicted_category": "access", "correct": true, "input_tokens": 187, "output_tokens": 66, "cost_usd": 0.001551, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 9, "subject": "Order marked delivered but never arrived", "truth_category": "delivery", "pipeline": "agentic", "predicted_category": "delivery", "correct": true, "input_tokens": 173, "output_tokens": 72, "cost_usd": 0.001599, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 10, "subject": "Tracking hasn't updated in 5 days", "truth_category": "delivery", "pipeline": "agentic", "predicted_category": "delivery", "correct": true, "input_tokens": 179, "output_tokens": 72, "cost_usd": 0.001617, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 11, "subject": "Wrong item delivered", "truth_category": "delivery", "pipeline": "agentic", "predicted_category": "delivery", "correct": true, "input_tokens": 162, "output_tokens": 72, "cost_usd": 0.001566, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 12, "subject": "Change delivery address before shipping", "truth_category": "delivery", "pipeline": "agentic", "predicted_category": "delivery", "correct": true, "input_tokens": 162, "output_tokens": 72, "cost_usd": 0.001566, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 13, "subject": "Refund for my cancelled subscription never came through", "truth_category": "refund", "pipeline": "agentic", "predicted_category": "refund", "correct": true, "input_tokens": 164, "output_tokens": 60, "cost_usd": 0.001392, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 14, "subject": "Want a refund, product arrived damaged", "truth_category": "refund", "pipeline": "agentic", "predicted_category": "refund", "correct": true, "input_tokens": 156, "output_tokens": 60, "cost_usd": 0.001368, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 15, "subject": "Refund policy for annual plan cancellation", "truth_category": "refund", "pipeline": "agentic", "predicted_category": "refund", "correct": true, "input_tokens": 158, "output_tokens": 60, "cost_usd": 0.001374, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 16, "subject": "Partial refund for unused months", "truth_category": "refund", "pipeline": "agentic", "predicted_category": "refund", "correct": true, "input_tokens": 156, "output_tokens": 60, "cost_usd": 0.001368, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 17, "subject": "App crashes when I export a report", "truth_category": "bug", "pipeline": "agentic", "predicted_category": "bug", "correct": true, "input_tokens": 176, "output_tokens": 66, "cost_usd": 0.001518, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 18, "subject": "Dashboard charts show blank after update", "truth_category": "bug", "pipeline": "agentic", "predicted_category": "bug", "correct": true, "input_tokens": 163, "output_tokens": 66, "cost_usd": 0.001479, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 19, "subject": "Upload button does nothing on Safari", "truth_category": "bug", "pipeline": "agentic", "predicted_category": "bug", "correct": true, "input_tokens": 169, "output_tokens": 66, "cost_usd": 0.001497, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 20, "subject": "Search returns no results for existing items", "truth_category": "bug", "pipeline": "agentic", "predicted_category": "bug", "correct": true, "input_tokens": 166, "output_tokens": 66, "cost_usd": 0.001488, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 21, "subject": "Change the email on my account", "truth_category": "account", "pipeline": "agentic", "predicted_category": "account", "correct": true, "input_tokens": 153, "output_tokens": 64, "cost_usd": 0.001419, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 22, "subject": "Close my account and delete my data", "truth_category": "account", "pipeline": "agentic", "predicted_category": "account", "correct": true, "input_tokens": 162, "output_tokens": 64, "cost_usd": 0.001446, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 23, "subject": "Update my company name on the account", "truth_category": "account", "pipeline": "agentic", "predicted_category": "account", "correct": true, "input_tokens": 156, "output_tokens": 64, "cost_usd": 0.001428, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 24, "subject": "I was charged and I can't log in", "truth_category": "billing", "pipeline": "agentic", "predicted_category": "billing", "correct": true, "input_tokens": 185, "output_tokens": 75, "cost_usd": 0.00168, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 25, "subject": "My order arrived late and the app crashes", "truth_category": "delivery", "pipeline": "agentic", "predicted_category": "delivery", "correct": true, "input_tokens": 187, "output_tokens": 72, "cost_usd": 0.001641, "model_calls": 5, "debug_calls": 0}, {"ticket_id": 1, "subject": "Charged twice for my subscription", "truth_category": "billing", "pipeline": "token_minimal", "predicted_category": "billing", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 2, "subject": "Invoice shows the wrong plan price", "truth_category": "billing", "pipeline": "token_minimal", "predicted_category": "billing", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 3, "subject": "Payment failed but money was deducted", "truth_category": "billing", "pipeline": "token_minimal", "predicted_category": "billing", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 4, "subject": "Need a copy of last month's invoice", "truth_category": "billing", "pipeline": "token_minimal", "predicted_category": "billing", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 5, "subject": "Cannot log in, password reset link expired", "truth_category": "access", "pipeline": "token_minimal", "predicted_category": "access", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 6, "subject": "Two-factor codes not arriving", "truth_category": "access", "pipeline": "token_minimal", "predicted_category": "access", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 7, "subject": "Locked out after too many attempts", "truth_category": "access", "pipeline": "token_minimal", "predicted_category": "access", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 8, "subject": "SSO login loops back to the sign-in page", "truth_category": "access", "pipeline": "token_minimal", "predicted_category": "access", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 9, "subject": "Order marked delivered but never arrived", "truth_category": "delivery", "pipeline": "token_minimal", "predicted_category": "delivery", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 10, "subject": "Tracking hasn't updated in 5 days", "truth_category": "delivery", "pipeline": "token_minimal", "predicted_category": "delivery", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 11, "subject": "Wrong item delivered", "truth_category": "delivery", "pipeline": "token_minimal", "predicted_category": "delivery", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 12, "subject": "Change delivery address before shipping", "truth_category": "delivery", "pipeline": "token_minimal", "predicted_category": "delivery", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 13, "subject": "Refund for my cancelled subscription never came through", "truth_category": "refund", "pipeline": "token_minimal", "predicted_category": "refund", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 14, "subject": "Want a refund, product arrived damaged", "truth_category": "refund", "pipeline": "token_minimal", "predicted_category": "refund", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 15, "subject": "Refund policy for annual plan cancellation", "truth_category": "refund", "pipeline": "token_minimal", "predicted_category": "refund", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 16, "subject": "Partial refund for unused months", "truth_category": "refund", "pipeline": "token_minimal", "predicted_category": "refund", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 17, "subject": "App crashes when I export a report", "truth_category": "bug", "pipeline": "token_minimal", "predicted_category": "bug", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 18, "subject": "Dashboard charts show blank after update", "truth_category": "bug", "pipeline": "token_minimal", "predicted_category": "bug", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 19, "subject": "Upload button does nothing on Safari", "truth_category": "bug", "pipeline": "token_minimal", "predicted_category": "bug", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 20, "subject": "Search returns no results for existing items", "truth_category": "bug", "pipeline": "token_minimal", "predicted_category": "bug", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 21, "subject": "Change the email on my account", "truth_category": "account", "pipeline": "token_minimal", "predicted_category": "account", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 22, "subject": "Close my account and delete my data", "truth_category": "account", "pipeline": "token_minimal", "predicted_category": "account", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 23, "subject": "Update my company name on the account", "truth_category": "account", "pipeline": "token_minimal", "predicted_category": "account", "correct": true, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "model_calls": 0, "debug_calls": 0}, {"ticket_id": 24, "subject": "I was charged and I can't log in", "truth_category": "billing", "pipeline": "token_minimal", "predicted_category": "billing", "correct": true, "input_tokens": 92, "output_tokens": 35, "cost_usd": 0.000801, "model_calls": 1, "debug_calls": 1}, {"ticket_id": 25, "subject": "My order arrived late and the app crashes", "truth_category": "delivery", "pipeline": "token_minimal", "predicted_category": "delivery", "correct": true, "input_tokens": 95, "output_tokens": 35, "cost_usd": 0.00081, "model_calls": 1, "debug_calls": 1}]};
+
+function money(n) { return "$" + n.toFixed(6); }
+
+function render(d) {
+  var a = d.totals.agentic, b = d.totals.token_minimal;
+  document.getElementById("stats").innerHTML =
+    '<div class="card bad"><div class="label">Agentic cost</div><div class="value">' + money(a.cost_usd) + '</div><div class="note">' + a.total_tokens + ' tokens · ' + a.model_calls + ' calls</div></div>' +
+    '<div class="card good"><div class="label">Token-minimal cost</div><div class="value">' + money(b.cost_usd) + '</div><div class="note">' + b.total_tokens + ' tokens · ' + b.model_calls + ' calls</div></div>' +
+    '<div class="card good"><div class="label">Cost saved</div><div class="value">' + d.savings_pct + '%</div><div class="note">at identical accuracy</div></div>' +
+    '<div class="card"><div class="label">Accuracy (both pipelines)</div><div class="value">' + (a.accuracy * 100).toFixed(0) + '%</div><div class="note">' + a.correct + '/' + a.tickets + ' tickets correct each</div></div>';
+  var byTicket = {};
+  d.rows.forEach(function (r) {
+    (byTicket[r.ticket_id] = byTicket[r.ticket_id] || { subject: r.subject, truth: r.truth_category })[r.pipeline] = r;
+  });
+  var html = "";
+  Object.keys(byTicket).sort(function (x, y) { return x - y; }).forEach(function (id) {
+    var t = byTicket[id], ag = t.agentic, mn = t.token_minimal;
+    var gate = mn.debug_calls > 0
+      ? '<span class="pill debug">debug × ' + mn.debug_calls + '</span>'
+      : '<span class="pill zero">passed · 0 tokens</span>';
+    html += "<tr><td>#" + id + " " + t.subject + "</td><td>" + t.truth + "</td>" +
+      '<td class="num">' + (ag.input_tokens + ag.output_tokens) + "</td>" +
+      '<td class="num">' + money(ag.cost_usd) + "</td>" +
+      '<td class="num">' + (mn.input_tokens + mn.output_tokens) + "</td>" +
+      '<td class="num">' + money(mn.cost_usd) + "</td><td>" + gate + "</td></tr>";
+  });
+  document.getElementById("rows").innerHTML = html;
+  if (window.anime) {
+    anime({ targets: ".card", opacity: [0, 1], translateY: [14, 0], delay: anime.stagger(70), duration: 500, easing: "easeOutQuad" });
+  }
+}
+
+if (FALLBACK) { render(FALLBACK); }
+fetch(API_BASE + "/compare").then(function (r) { return r.json(); }).then(function (d) {
+  render(d);
+  var badge = document.getElementById("modeBadge");
+  badge.textContent = "LIVE · demo API · " + badge.textContent.split("·").slice(1).join("·");
+  badge.classList.add("live");
+}).catch(function () { /* keep the precomputed run */ });
+</script>
+</body>
+</html>
